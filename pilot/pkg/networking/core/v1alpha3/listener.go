@@ -601,6 +601,7 @@ func (configgen *ConfigGeneratorImpl) buildSidecarInboundListenerForPortOrUDS(no
 			}
 
 		default:
+			log.Warnf("Test %v", "thrift")
 			log.Warnf("Unsupported inbound protocol %v for port %#v", pluginParams.ListenerProtocol,
 				pluginParams.ServiceInstance.Endpoint.ServicePort)
 			return nil
