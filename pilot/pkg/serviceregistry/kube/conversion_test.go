@@ -406,6 +406,11 @@ func TestProbesToPortsConversion(t *testing.T) {
 			Port:     9080,
 			Protocol: protocol.HTTP,
 		},
+		{
+			Name:     "mgmt-9090",
+			Port:     9090,
+			Protocol: protocol.Thrift,
+		},
 	}
 
 	handlers := []coreV1.Handler{
@@ -431,6 +436,16 @@ func TestProbesToPortsConversion(t *testing.T) {
 				Port: intstr.IntOrString{IntVal: 9080, Type: intstr.Int},
 			},
 		},
+		{
+			TCPSocket: &coreV1.TCPSocketAction{
+				Port: intstr.IntOrString{StrVal: "thrift", Type: intstr.String},
+			},
+		},
+		{
+			TCPSocket: &coreV1.TCPSocketAction{
+				Port: intstr.IntOrString{IntVal: 9090, Type: intstr.Int},
+			},
+		},
 	}
 
 	podSpec := &coreV1.PodSpec{
@@ -445,6 +460,10 @@ func TestProbesToPortsConversion(t *testing.T) {
 					{
 						Name:          "http-two",
 						ContainerPort: 9080,
+					},
+					{
+						Name:          "thrift",
+						ContainerPort: 9090,
 					},
 					{
 						Name:          "http",

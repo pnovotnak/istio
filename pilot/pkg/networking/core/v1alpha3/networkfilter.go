@@ -16,6 +16,7 @@ package v1alpha3
 
 import (
 	"fmt"
+	"istio.io/pkg/log"
 	"time"
 
 	"github.com/envoyproxy/go-control-plane/envoy/api/v2/listener"
@@ -25,6 +26,7 @@ import (
 	mysql_proxy "github.com/envoyproxy/go-control-plane/envoy/config/filter/network/mysql_proxy/v1alpha1"
 	redis_proxy "github.com/envoyproxy/go-control-plane/envoy/config/filter/network/redis_proxy/v2"
 	tcp_proxy "github.com/envoyproxy/go-control-plane/envoy/config/filter/network/tcp_proxy/v2"
+	thrift_proxy "github.com/envoyproxy/go-control-plane/envoy/config/filter/network/thrift_proxy/v2alpha1"
 	xdsutil "github.com/envoyproxy/go-control-plane/pkg/util"
 
 	networking "istio.io/api/networking/v1alpha3"
@@ -170,6 +172,14 @@ func buildNetworkFiltersStack(node *model.Proxy, port *model.Port, tcpFilter *li
 			filterstack = append(filterstack, buildMySQLFilter(statPrefix, util.IsXDSMarshalingToAnyEnabled(node)))
 		}
 		filterstack = append(filterstack, tcpFilter)
+	case protocol.Thrift:
+		log.Debug("thrift filter applied")
+		if features.EnableMysqlFilter.Get() {
+			// thrift must be the last filter chain
+			filterstack = append(filterstack, buildThriftFilter(statPrefix, util.IsXDSMarshalingToAnyEnabled(node)))
+		} else {
+			filterstack = append(filterstack, tcpFilter)
+		}
 	default:
 		filterstack = append(filterstack, tcpFilter)
 	}
@@ -272,6 +282,25 @@ func buildMySQLFilter(statPrefix string, isXDSMarshalingToAnyEnabled bool) *list
 		out.ConfigType = &listener.Filter_TypedConfig{TypedConfig: util.MessageToAny(mySQLProxy)}
 	} else {
 		out.ConfigType = &listener.Filter_Config{Config: util.MessageToStruct(mySQLProxy)}
+	}
+
+	return out
+}
+
+// buildThriftFilter builds an outbound Envoy MySQLProxy filter.
+func buildThriftFilter(statPrefix string, isXDSMarshalingToAnyEnabled bool) *listener.Filter {
+	thriftProxy := &thrift_proxy.ThriftProxy{
+		StatPrefix: statPrefix, // TODO (peter.novotnak@reddit.com) Thrift stats are prefixed with thrift.<statPrefix> by Envoy.
+	}
+
+	out := &listener.Filter{
+		Name: xdsutil.ThriftProxy,
+	}
+
+	if isXDSMarshalingToAnyEnabled {
+		out.ConfigType = &listener.Filter_TypedConfig{TypedConfig: util.MessageToAny(thriftProxy)}
+	} else {
+		out.ConfigType = &listener.Filter_Config{Config: util.MessageToStruct(thriftProxy)}
 	}
 
 	return out

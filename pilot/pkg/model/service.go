@@ -136,6 +136,42 @@ type Port struct {
 // PortList is a set of ports
 type PortList []*Port
 
+// Protocol defines network protocols for ports
+type Protocol string
+
+const (
+	// ProtocolGRPC declares that the port carries gRPC traffic.
+	ProtocolGRPC Protocol = "GRPC"
+	// ProtocolGRPCWeb declares that the port carries gRPC traffic.
+	ProtocolGRPCWeb Protocol = "GRPC-Web"
+	// ProtocolHTTP declares that the port carries HTTP/1.1 traffic.
+	// Note that HTTP/1.0 or earlier may not be supported by the proxy.
+	ProtocolHTTP Protocol = "HTTP"
+	// ProtocolHTTP2 declares that the port carries HTTP/2 traffic.
+	ProtocolHTTP2 Protocol = "HTTP2"
+	// ProtocolHTTPS declares that the port carries HTTPS traffic.
+	ProtocolHTTPS Protocol = "HTTPS"
+	// ProtocolTCP declares the the port uses TCP.
+	// This is the default protocol for a service port.
+	ProtocolTCP Protocol = "TCP"
+	// ProtocolThrift declares that the port carries Thrift traffic.
+	ProtocolThrift Protocol = "Thrift"
+	// ProtocolTLS declares that the port carries TLS traffic.
+	// TLS traffic is assumed to contain SNI as part of the handshake.
+	ProtocolTLS Protocol = "TLS"
+	// ProtocolUDP declares that the port uses UDP.
+	// Note that UDP protocol is not currently supported by the proxy.
+	ProtocolUDP Protocol = "UDP"
+	// ProtocolMongo declares that the port carries MongoDB traffic.
+	ProtocolMongo Protocol = "Mongo"
+	// ProtocolRedis declares that the port carries Redis traffic.
+	ProtocolRedis Protocol = "Redis"
+	// ProtocolMySQL declares that the port carries MySQL traffic.
+	ProtocolMySQL Protocol = "MySQL"
+	// ProtocolUnsupported - value to signify that the protocol is unsupported.
+	ProtocolUnsupported Protocol = "UnsupportedProtocol"
+)
+
 // AddressFamily indicates the kind of transport used to reach a NetworkEndpoint
 type AddressFamily int
 

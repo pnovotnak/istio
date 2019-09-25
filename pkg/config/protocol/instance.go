@@ -45,6 +45,8 @@ const (
 	// TLS declares that the port carries TLS traffic.
 	// TLS traffic is assumed to contain SNI as part of the handshake.
 	TLS Instance = "TLS"
+	// Thrift declares that the port carries Thrift traffic.
+	Thrift Instance = "Thrift"
 	// UDP declares that the port uses UDP.
 	// Note that UDP protocol is not currently supported by the proxy.
 	UDP Instance = "UDP"
@@ -83,6 +85,8 @@ func Parse(s string) Instance {
 		return Redis
 	case "mysql":
 		return MySQL
+	case "thrift":
+		return Thrift
 	}
 
 	return Unsupported

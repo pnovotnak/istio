@@ -465,6 +465,8 @@ func (configgen *ConfigGeneratorImpl) buildSidecarInboundListeners(
 		}
 	}
 
+	log.Debugf("Listeners: %s", listeners)
+
 	return listeners
 }
 
@@ -514,6 +516,28 @@ func (configgen *ConfigGeneratorImpl) buildSidecarInboundHTTPListenerOptsForPort
 	return httpOpts
 }
 
+func (configgen *ConfigGeneratorImpl) buildSidecarInboundThriftListenerOptsForPortOrUDS(node *model.Proxy, pluginParams *plugin.InputParams) *thriftListenerOpts {
+	clusterName := pluginParams.InboundClusterName
+	if clusterName == "" {
+		// In case of unix domain sockets, the service port will be 0. So use the port name to distinguish the
+		// inbound listeners that a user specifies in Sidecar. Otherwise, all inbound clusters will be the same.
+		// We use the port name as the subset in the inbound cluster for differentiation. Its fine to use port
+		// names here because the inbound clusters are not referred to anywhere in the API, unlike the outbound
+		// clusters and these are static endpoint clusters used only for sidecar (proxy -> app)
+		clusterName = model.BuildSubsetKey(model.TrafficDirectionInbound, pluginParams.ServiceInstance.Endpoint.ServicePort.Name,
+			pluginParams.ServiceInstance.Service.Hostname, pluginParams.ServiceInstance.Endpoint.ServicePort.Port)
+	}
+
+	// TODO(peter.novotnak@reddit.com) support more features here
+	thriftOpts := &thriftListenerOpts{
+		useRemoteAddress: false,
+		protocol:         1,
+		transport:        3,
+	}
+
+	return thriftOpts
+}
+
 // buildSidecarInboundListenerForPortOrUDS creates a single listener on the server-side (inbound)
 // for a given port or unix domain socket
 func (configgen *ConfigGeneratorImpl) buildSidecarInboundListenerForPortOrUDS(node *model.Proxy, listenerOpts buildListenerOpts,
@@ -560,6 +584,7 @@ func (configgen *ConfigGeneratorImpl) buildSidecarInboundListenerForPortOrUDS(no
 
 	for id, chain := range allChains {
 		var httpOpts *httpListenerOpts
+		var thriftOpts *thriftListenerOpts
 		var tcpNetworkFilters []*listener.Filter
 		var filterChainMatch *listener.FilterChainMatch
 
@@ -567,6 +592,11 @@ func (configgen *ConfigGeneratorImpl) buildSidecarInboundListenerForPortOrUDS(no
 		case plugin.ListenerProtocolHTTP:
 			filterChainMatch = chain.FilterChainMatch
 			httpOpts = configgen.buildSidecarInboundHTTPListenerOptsForPortOrUDS(node, pluginParams)
+
+		case plugin.ListenerProtocolThrift:
+			log.Debugf("thrift protocol applied")
+			filterChainMatch = chain.FilterChainMatch
+			thriftOpts = configgen.buildSidecarInboundThriftListenerOptsForPortOrUDS(node, pluginParams)
 
 		case plugin.ListenerProtocolTCP:
 			filterChainMatch = chain.FilterChainMatch
@@ -613,6 +643,7 @@ func (configgen *ConfigGeneratorImpl) buildSidecarInboundListenerForPortOrUDS(no
 
 		listenerOpts.filterChainOpts = append(listenerOpts.filterChainOpts, &filterChainOpts{
 			httpOpts:        httpOpts,
+			thriftOpts:      thriftOpts,
 			networkFilters:  tcpNetworkFilters,
 			tlsContext:      chain.TLSContext,
 			match:           filterChainMatch,
@@ -664,6 +695,8 @@ func protocolName(node *model.Proxy, p protocol.Instance) string {
 	switch plugin.ModelProtocolToListenerProtocol(node, p, core.TrafficDirection_OUTBOUND) {
 	case plugin.ListenerProtocolHTTP:
 		return "HTTP"
+	case plugin.ListenerProtocolThrift:
+		return "Thrift"
 	case plugin.ListenerProtocolTCP:
 		return "TCP"
 	default:
@@ -1638,6 +1671,16 @@ type httpListenerOpts struct {
 	useRemoteAddress bool
 }
 
+// thriftListenerOpts are options for a Thrift listener
+type thriftListenerOpts struct {
+	// stat prefix for the thrift connection manager
+	// DO not set this field. Will be overridden by buildCompleteFilterChain
+	statPrefix       string
+	useRemoteAddress bool
+	transport        int
+	protocol         int
+}
+
 // filterChainOpts describes a filter chain: a set of filters with the same TLS context
 type filterChainOpts struct {
 	sniHosts         []string
@@ -1645,6 +1688,7 @@ type filterChainOpts struct {
 	metadata         *core.Metadata
 	tlsContext       *auth.DownstreamTlsContext
 	httpOpts         *httpListenerOpts
+	thriftOpts       *thriftListenerOpts
 	match            *listener.FilterChainMatch
 	listenerFilters  []*listener.ListenerFilter
 	networkFilters   []*listener.Filter
@@ -1961,6 +2005,10 @@ func buildCompleteFilterChain(pluginParams *plugin.InputParams, mutable *plugin.
 		chain := mutable.FilterChains[i]
 		opt := opts.filterChainOpts[i]
 		mutable.Listener.FilterChains[i].Metadata = opt.metadata
+
+		if opt.thriftOpts != nil {
+			opt.thriftOpts.statPrefix = mutable.Listener.Name
+		}
 
 		// we are building a network filter chain (no http connection manager) for this filter chain
 		// In HTTP, we need to have mixer, RBAC, etc. upfront so that they can enforce policies immediately
