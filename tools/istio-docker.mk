@@ -113,7 +113,9 @@ docker.proxy_debug: pilot/docker/envoy_telemetry.yaml.tmpl
 # The file must be named 'envoy', depends on the release.
 ${ISTIO_ENVOY_LINUX_RELEASE_DIR}/envoy: ${ISTIO_ENVOY_LINUX_RELEASE_PATH}
 	mkdir -p $(DOCKER_BUILD_TOP)/proxyv2
-	cp ${ISTIO_ENVOY_LINUX_RELEASE_PATH} ${ISTIO_ENVOY_LINUX_RELEASE_DIR}/envoy
+	if [[ "${ISTIO_ENVOY_LINUX_RELEASE_PATH}" != "${ISTIO_ENVOY_LINUX_RELEASE_DIR}/envoy" ]]; then \
+		cp ${ISTIO_ENVOY_LINUX_RELEASE_PATH} ${ISTIO_ENVOY_LINUX_RELEASE_DIR}/envoy; \
+	fi
 
 # Default proxy image.
 docker.proxyv2: BUILD_PRE=chmod 755 envoy pilot-agent &&
